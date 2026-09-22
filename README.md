@@ -183,7 +183,7 @@ Make sure that each model is assigned a distinct output path.
 Run:
 
 ```bash
-python collect_data.py
+python run-experiments.py
 ```
 
 The script:
@@ -257,6 +257,99 @@ For the default configuration:
 ```
 
 The script verifies that every possible history appears exactly the requested number of times.
+
+
+## Analysis
+
+The analysis script measures how well different summaries of the recent game history explain an LLM's next action.
+
+For a horizon of \(R=4\), each past round has four possible joint outcomes:
+
+```text
+LL, LR, RL, RR
+```
+
+There are fifteen possible ways to group these four outcomes into nonempty categories, called **partitions**. For example:
+
+```text
+{{LL}, {LR, RL, RR}}
+```
+
+isolates mutual `L` play from all other outcomes, while:
+
+```text
+{{LL}, {LR, RL}, {RR}}
+```
+
+is a counting partition: it distinguishes zero, one, and two `L` actions in a round.
+
+For each one-round partition \(P\), the analysis constructs its product partition \(P^k\) over the previous \(k\) rounds. It then computes the empirical conditional entropy
+
+$$
+\mathrm{CE}_{P^k},
+$$
+
+which measures how unpredictable the model's next action remains after knowing only the partition block containing the recent history.
+
+The benchmark is the full partition:
+
+$$
+P_0 =
+\bigl\{
+\{LL\},
+\{LR\},
+\{RL\},
+\{RR\}
+\bigr\},
+$$
+
+whose product \((P_0)^k\) retains the complete \(k\)-round history. For every non-full partition, the script reports:
+
+$$
+\mathrm{CE}_{P^k}
+-
+\mathrm{CE}_{(P_0)^k}.
+$$
+
+A value near zero means that the coarser partition explains the model's choices almost as well as the complete history. Larger values indicate that the partition discards distinctions that are important for predicting the model's action.
+
+The script also reports the mean difference across lookback lengths:
+
+$$
+\frac{1}{R+1}
+\sum_{k=0}^{R}
+\left[
+\mathrm{CE}_{P^k}
+-
+\mathrm{CE}_{(P_0)^k}
+\right].
+$$
+
+Non-full partitions are ranked from lowest to highest mean difference. Thus, the top-ranked partition provides the most compact explanation of the data among the candidate partitions.
+
+Run the analysis with:
+
+```bash
+python analysis.py \
+  data/claude-sonnet-4-6/version-2/data_llm_H4_T00_norev_words.json
+```
+
+To also print LaTeX tables:
+
+```bash
+python analysis.py \
+  data/claude-sonnet-4-6/version-2/data_llm_H4_T00_norev_words.json \
+  --latex
+```
+
+To save results in JSON format:
+
+```bash
+python analysis.py \
+  data/claude-sonnet-4-6/version-2/data_llm_H4_T00_norev_words.json \
+  --output results.json
+```
+
 
 ## Notes on Llama output
 
